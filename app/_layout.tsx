@@ -1,11 +1,15 @@
-import React from "react"
-import { StyleSheet, View } from "react-native"
+import React, { useState } from "react"
+import { StyleSheet, View, ColorValue } from "react-native"
 import DrawingArea from "../components/DrawingArea"
+import ColorPicker from "../components/ColorPicker"
 
-export default function Index() {
+export default function App() {
+    const [color, setColor] = useState<ColorValue>("blue")
+
     return (
         <View style={styles.container}>
-            <DrawingArea />
+            <DrawingArea {...{ color }} />
+            <ColorPicker {...{ color, setColor }} />
         </View>
     )
 }

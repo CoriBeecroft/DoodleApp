@@ -1,15 +1,31 @@
-import React, { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import {
     StyleSheet,
     View,
     PanResponder,
     PanResponderGestureState,
+    ColorValue,
 } from "react-native"
 import { Canvas, Path, SkPath, Skia } from "@shopify/react-native-skia"
+import { colorValueToSkiaColor } from "../utils/util"
 
-export default function DrawingArea() {
-    const [paths, setPaths] = useState<SkPath[]>([])
-    const pathRef = useRef<SkPath | null>(null)
+interface DrawingAreaProps {
+    color: ColorValue
+}
+
+interface StyledPath {
+    path: SkPath
+    color: ColorValue
+}
+
+export default function DrawingArea({ color }: DrawingAreaProps) {
+    const [paths, setPaths] = useState<StyledPath[]>([])
+    const pathRef = useRef<StyledPath | null>(null)
+    const colorRef = useRef(color)
+
+    useEffect(() => {
+        colorRef.current = color
+    }, [color])
 
     const panResponder = useRef(
         PanResponder.create({
@@ -17,7 +33,7 @@ export default function DrawingArea() {
             onMoveShouldSetPanResponder: () => true,
             onPanResponderGrant: () => {
                 // touch start
-                const path = Skia.Path.Make()
+                const path = { path: Skia.Path.Make(), color: colorRef.current }
                 pathRef.current = path
                 setPaths(prevPaths => {
                     return [...prevPaths, path]
@@ -26,10 +42,10 @@ export default function DrawingArea() {
             onPanResponderMove: (_, gestureState: PanResponderGestureState) => {
                 if (pathRef.current) {
                     const { moveX, moveY } = gestureState
-                    if (pathRef.current.isEmpty()) {
-                        pathRef.current.moveTo(moveX, moveY)
+                    if (pathRef.current.path.isEmpty()) {
+                        pathRef.current.path.moveTo(moveX, moveY)
                     } else {
-                        pathRef.current.lineTo(moveX, moveY)
+                        pathRef.current.path.lineTo(moveX, moveY)
                     }
                     setPaths(prevPaths => [
                         ...prevPaths.slice(0, -1),
@@ -47,13 +63,13 @@ export default function DrawingArea() {
     return (
         <View style={styles.container} {...panResponder.panHandlers}>
             <Canvas style={styles.canvas}>
-                {paths.map((path, index) => (
+                {paths.map((styledPath, index) => (
                     <Path
                         key={index}
-                        path={path}
-                        strokeWidth={1}
+                        path={styledPath.path}
+                        strokeWidth={5}
                         style="stroke"
-                        color="black"
+                        color={colorValueToSkiaColor(styledPath.color)}
                     />
                 ))}
             </Canvas>
