@@ -150,11 +150,11 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         paddingHorizontal: 8,
         borderRadius: 10,
-        shadowColor: "#888",
-        shadowOffset: { width: 3, height: 3 },
-        shadowOpacity: 1,
-        shadowRadius: 4,
-        backgroundColor: "white",
+        // shadowColor: "#888",
+        // shadowOffset: { width: 3, height: 3 },
+        // shadowOpacity: 1,
+        // shadowRadius: 4,
+        // backgroundColor: "white",
     },
 })
 

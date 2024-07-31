@@ -83,5 +83,6 @@ const styles = StyleSheet.create({
     },
     canvas: {
         flex: 1,
+        backgroundColor: "white",
     },
 })
