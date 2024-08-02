@@ -1,9 +1,7 @@
 import React, { useState } from "react"
-import { StyleSheet, SafeAreaView, ColorValue, View } from "react-native"
+import { StyleSheet, SafeAreaView, ColorValue } from "react-native"
 import DrawingArea from "../components/DrawingArea"
-import ColorPicker, { BLUE } from "../components/ColorPicker"
-import StrokeWidthPicker from "../components/StrokeWidthPicker"
-import OpacityPicker from "../components/OpacityPicker"
+import DrawingOptions, { BLUE } from "../components/DrawingOptions"
 
 export default function App() {
     const [color, setColor] = useState<ColorValue>(BLUE)
@@ -13,11 +11,16 @@ export default function App() {
     return (
         <SafeAreaView style={styles.container}>
             <DrawingArea {...{ color, strokeWidth, opacity }} />
-            <View style={styles.optionContainer}>
-                <ColorPicker {...{ color, setColor }} />
-                <StrokeWidthPicker {...{ strokeWidth, setStrokeWidth }} />
-                <OpacityPicker {...{ opacity, setOpacity }} />
-            </View>
+            <DrawingOptions
+                {...{
+                    color,
+                    setColor,
+                    strokeWidth,
+                    setStrokeWidth,
+                    opacity,
+                    setOpacity,
+                }}
+            />
         </SafeAreaView>
     )
 }
@@ -25,9 +28,6 @@ export default function App() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#333",
-    },
-    optionContainer: {
-        padding: 8,
+        backgroundColor: "#555",
     },
 })
