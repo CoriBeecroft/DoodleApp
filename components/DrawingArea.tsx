@@ -11,21 +11,33 @@ import { colorValueToSkiaColor } from "../utils/util"
 
 interface DrawingAreaProps {
     color: ColorValue
+    strokeWidth: number
+    opacity: number
 }
 
 interface StyledPath {
     path: SkPath
     color: ColorValue
+    strokeWidth: number
+    opacity: number
 }
 
-export default function DrawingArea({ color }: DrawingAreaProps) {
+export default function DrawingArea({
+    color,
+    strokeWidth,
+    opacity,
+}: DrawingAreaProps) {
     const [paths, setPaths] = useState<StyledPath[]>([])
     const pathRef = useRef<StyledPath | null>(null)
-    const colorRef = useRef(color)
+    const drawingOptionsRef = useRef({ color, strokeWidth, opacity })
 
     useEffect(() => {
-        colorRef.current = color
-    }, [color])
+        drawingOptionsRef.current = {
+            color,
+            strokeWidth,
+            opacity,
+        }
+    }, [color, strokeWidth, opacity])
 
     const panResponder = useRef(
         PanResponder.create({
@@ -33,7 +45,10 @@ export default function DrawingArea({ color }: DrawingAreaProps) {
             onMoveShouldSetPanResponder: () => true,
             onPanResponderGrant: () => {
                 // touch start
-                const path = { path: Skia.Path.Make(), color: colorRef.current }
+                const path = {
+                    path: Skia.Path.Make(),
+                    ...drawingOptionsRef.current,
+                }
                 pathRef.current = path
                 setPaths(prevPaths => {
                     return [...prevPaths, path]
@@ -67,9 +82,10 @@ export default function DrawingArea({ color }: DrawingAreaProps) {
                     <Path
                         key={index}
                         path={styledPath.path}
-                        strokeWidth={5}
+                        strokeWidth={10 * styledPath.strokeWidth}
                         style="stroke"
                         color={colorValueToSkiaColor(styledPath.color)}
+                        opacity={Math.max(Math.min(styledPath.opacity, 1), 0)} // Opacity value needs to be between 0 and 1 (inclusive)
                     />
                 ))}
             </Canvas>
