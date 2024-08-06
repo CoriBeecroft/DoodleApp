@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useMemo } from "react"
 import {
     StyleSheet,
     View,
     PanResponder,
     PanResponderGestureState,
     ColorValue,
+    TouchableOpacity,
+    Text,
 } from "react-native"
 import { Canvas, Path, SkPath, Skia } from "@shopify/react-native-skia"
 import { colorValueToSkiaColor } from "../utils/util"
@@ -27,7 +29,10 @@ export default function DrawingArea({
     strokeWidth,
     opacity,
 }: DrawingAreaProps) {
+    const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 })
     const [paths, setPaths] = useState<StyledPath[]>([])
+    const [redoPaths, setRedoPaths] = useState<StyledPath[]>([])
+    const [isDrawing, setIsDrawing] = useState<boolean>(false)
     const pathRef = useRef<StyledPath | null>(null)
     const drawingOptionsRef = useRef({ color, strokeWidth, opacity })
 
@@ -39,28 +44,35 @@ export default function DrawingArea({
         }
     }, [color, strokeWidth, opacity])
 
-    const panResponder = useRef(
-        PanResponder.create({
+    const panResponder = useMemo(() => {
+        return PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
             onPanResponderGrant: () => {
-                // touch start
                 const path = {
                     path: Skia.Path.Make(),
                     ...drawingOptionsRef.current,
                 }
                 pathRef.current = path
-                setPaths(prevPaths => {
-                    return [...prevPaths, path]
-                })
+                setPaths(prevPaths => [...prevPaths, path])
+                setRedoPaths([]) // Clear redo stack when a new path is started
+                setIsDrawing(true)
             },
             onPanResponderMove: (_, gestureState: PanResponderGestureState) => {
                 if (pathRef.current) {
                     const { moveX, moveY } = gestureState
+                    // canvasOffset is used to translate moveX and moveY to
+                    // canvas coordinates instead of screen coordinates
+                    const x = moveX - canvasOffset.x,
+                        y = moveY - canvasOffset.y
+
                     if (pathRef.current.path.isEmpty()) {
-                        pathRef.current.path.moveTo(moveX, moveY)
+                        pathRef.current.path.moveTo(x, y)
                     } else {
-                        pathRef.current.path.lineTo(moveX, moveY)
+                        const lastPoint = pathRef.current.path.getLastPt()
+                        if (lastPoint.x !== x || lastPoint.y !== y) {
+                            pathRef.current.path.lineTo(x, y)
+                        }
                     }
                     setPaths(prevPaths => [
                         ...prevPaths.slice(0, -1),
@@ -69,33 +81,139 @@ export default function DrawingArea({
                 }
             },
             onPanResponderRelease: () => {
-                // touch end
+                // filter out paths that only have one point and therefore
+                // won't end up being rendered
+                setPaths(prevPaths =>
+                    prevPaths.filter(p => p.path.countPoints() > 1)
+                )
+                setIsDrawing(false)
                 pathRef.current = null
             },
         })
-    ).current
+    }, [canvasOffset])
+
+    const undo = () => {
+        if (paths.length > 0) {
+            const lastPath = paths[paths.length - 1]
+            setPaths(prevPaths => prevPaths.slice(0, -1))
+            setRedoPaths(prevRedoPaths => [...prevRedoPaths, lastPath])
+        }
+    }
+
+    const redo = () => {
+        if (redoPaths.length > 0) {
+            const pathToRedo = redoPaths[redoPaths.length - 1]
+            setRedoPaths(prevRedoPaths => prevRedoPaths.slice(0, -1))
+            setPaths(prevPaths => [...prevPaths, pathToRedo])
+        }
+    }
+
+    const clear = () => {
+        setPaths([])
+        setRedoPaths([])
+    }
+
+    // isDrawing is used here to avoid flashing of the undo and
+    // clear buttons in cases where the drawing area is touched but
+    // there is no movement so no path ends up being drawn.
+    const canUndoOrClear = isDrawing ? paths.length > 1 : paths.length > 0
+    const canRedo = redoPaths.length > 0
 
     return (
-        <View style={styles.container} {...panResponder.panHandlers}>
-            <Canvas style={styles.canvas}>
-                {paths.map((styledPath, index) => (
-                    <Path
-                        key={index}
-                        path={styledPath.path}
-                        strokeWidth={10 * styledPath.strokeWidth}
-                        style="stroke"
-                        color={colorValueToSkiaColor(styledPath.color)}
-                        opacity={Math.max(Math.min(styledPath.opacity, 1), 0)} // Opacity value needs to be between 0 and 1 (inclusive)
-                    />
-                ))}
-            </Canvas>
-        </View>
+        <>
+            <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                    style={styles.button}
+                    onPress={undo}
+                    disabled={!canUndoOrClear}
+                >
+                    <Text
+                        style={[
+                            styles.buttonText,
+                            !canUndoOrClear && styles.disabledButtonText,
+                        ]}
+                    >
+                        Undo
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.button}
+                    onPress={clear}
+                    disabled={!canUndoOrClear}
+                >
+                    <Text
+                        style={[
+                            styles.buttonText,
+                            !canUndoOrClear && styles.disabledButtonText,
+                        ]}
+                    >
+                        Clear
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.button}
+                    onPress={redo}
+                    disabled={!canRedo}
+                >
+                    <Text
+                        style={[
+                            styles.buttonText,
+                            !canRedo && styles.disabledButtonText,
+                        ]}
+                    >
+                        Redo
+                    </Text>
+                </TouchableOpacity>
+            </View>
+            <View
+                onLayout={event => {
+                    const { x, y } = event.nativeEvent.layout
+                    setCanvasOffset({ x, y })
+                }}
+                style={styles.container}
+                {...panResponder.panHandlers}
+            >
+                <Canvas style={styles.canvas}>
+                    {paths.map((styledPath, index) => (
+                        <Path
+                            key={index}
+                            path={styledPath.path}
+                            strokeWidth={10 * styledPath.strokeWidth}
+                            style="stroke"
+                            color={colorValueToSkiaColor(styledPath.color)}
+                            opacity={Math.max(
+                                Math.min(styledPath.opacity, 1),
+                                0
+                            )}
+                        />
+                    ))}
+                </Canvas>
+            </View>
+        </>
     )
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    buttonContainer: {
+        flexDirection: "row",
+    },
+    button: {
+        flex: 1,
+        borderColor: "#333",
+        borderWidth: 1,
+        padding: 10,
+        backgroundColor: "#444",
+    },
+    buttonText: {
+        color: "#fff",
+        fontSize: 16,
+        textAlign: "center",
+    },
+    disabledButtonText: {
+        color: "#999",
     },
     canvas: {
         flex: 1,
