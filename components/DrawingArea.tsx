@@ -8,41 +8,42 @@ import {
     TouchableOpacity,
     Text,
 } from "react-native"
-import { Canvas, Path, SkPath, Skia } from "@shopify/react-native-skia"
-import { colorValueToSkiaColor } from "../utils/util"
+import { Canvas, Skia } from "@shopify/react-native-skia"
+import StyledPath, { StyledPathProps } from "./StyledPath"
 
 interface DrawingAreaProps {
     color: ColorValue
     strokeWidth: number
     opacity: number
-}
-
-interface StyledPath {
-    path: SkPath
-    color: ColorValue
-    strokeWidth: number
-    opacity: number
+    pathEffect: string
 }
 
 export default function DrawingArea({
     color,
     strokeWidth,
     opacity,
+    pathEffect,
 }: DrawingAreaProps) {
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 })
-    const [paths, setPaths] = useState<StyledPath[]>([])
-    const [redoPaths, setRedoPaths] = useState<StyledPath[]>([])
+    const [paths, setPaths] = useState<StyledPathProps[]>([])
+    const [redoPaths, setRedoPaths] = useState<StyledPathProps[]>([])
     const [isDrawing, setIsDrawing] = useState<boolean>(false)
-    const pathRef = useRef<StyledPath | null>(null)
-    const drawingOptionsRef = useRef({ color, strokeWidth, opacity })
+    const pathRef = useRef<StyledPathProps | null>(null)
+    const drawingOptionsRef = useRef({
+        color,
+        strokeWidth,
+        opacity,
+        pathEffect,
+    })
 
     useEffect(() => {
         drawingOptionsRef.current = {
             color,
             strokeWidth,
             opacity,
+            pathEffect,
         }
-    }, [color, strokeWidth, opacity])
+    }, [color, strokeWidth, opacity, pathEffect])
 
     const panResponder = useMemo(() => {
         return PanResponder.create({
@@ -175,17 +176,7 @@ export default function DrawingArea({
             >
                 <Canvas style={styles.canvas}>
                     {paths.map((styledPath, index) => (
-                        <Path
-                            key={index}
-                            path={styledPath.path}
-                            strokeWidth={10 * styledPath.strokeWidth}
-                            style="stroke"
-                            color={colorValueToSkiaColor(styledPath.color)}
-                            opacity={Math.max(
-                                Math.min(styledPath.opacity, 1),
-                                0
-                            )}
-                        />
+                        <StyledPath key={index} {...styledPath} />
                     ))}
                 </Canvas>
             </View>

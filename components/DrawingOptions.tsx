@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from "react"
 import { StyleSheet, View, Animated, ColorValue } from "react-native"
 import SelectableButton from "./SelectableButton"
-import { Canvas, LinearGradient, Rect, vec } from "@shopify/react-native-skia"
+import {
+    Canvas,
+    LinearGradient,
+    Rect,
+    vec,
+    Skia,
+} from "@shopify/react-native-skia"
+import StyledPath from "./StyledPath"
+import { colorToRGBArray, colorValueToSkiaColor } from "@/utils/util"
 
 export const BLUE = "#3498db",
     GREEN = "#2ecc71",
@@ -19,7 +27,15 @@ interface DrawingOptionsProps {
     setStrokeWidth: (width: number) => void
     opacity: number
     setOpacity: (opacity: number) => void
+    effect: string
+    setEffect: (effect: string) => void
+    windowHeight: number
 }
+
+const path = Skia.Path.Make()
+path.moveTo(2, 2)
+path.cubicTo(10, 10, 10, 2, 16, 16)
+path.cubicTo(22, 30, 22, 22, 30, 30)
 
 export default function DrawingOptions({
     color,
@@ -28,25 +44,34 @@ export default function DrawingOptions({
     setStrokeWidth,
     opacity,
     setOpacity,
+    effect,
+    setEffect,
+    windowHeight,
 }: DrawingOptionsProps) {
+    const [mainButtonContainerHeight, setOptionsOffset] = useState(0)
     const [activeOption, setActiveOption] = useState("")
     const [newActiveOption, setNewActiveOption] = useState("")
-    const colorAnimatedOpacity = useRef(new Animated.Value(0)).current
+    const animatedOpacity = useRef(new Animated.Value(0)).current
     const options = {
         color: {
             currentValue: color,
             values: [BLUE, GREEN, YELLOW, ORANGE, RED, PURPLE, BLACK, GREY],
-            opacity: colorAnimatedOpacity,
+            opacity: animatedOpacity,
         },
         strokeWidth: {
             currentValue: color,
             values: [0.25, 0.5, 0.75, 1, 1.5, 1.75, 2],
-            opacity: colorAnimatedOpacity,
+            opacity: animatedOpacity,
         },
         opacity: {
             currentValue: color,
             values: [0.25, 0.5, 0.75, 1],
-            opacity: colorAnimatedOpacity,
+            opacity: animatedOpacity,
+        },
+        effect: {
+            currentValue: useEffect,
+            values: ["basic", "glow", "dash"],
+            opacity: animatedOpacity,
         },
     }
 
@@ -62,7 +87,7 @@ export default function DrawingOptions({
         if (activeOption === "") {
             // If no options are expanded, expand newActiveOption
             setActiveOption(newActiveOption)
-            Animated.timing(colorAnimatedOpacity, {
+            Animated.timing(animatedOpacity, {
                 toValue: 1,
                 duration: duration,
                 useNativeDriver: true,
@@ -70,7 +95,7 @@ export default function DrawingOptions({
         } else if (newActiveOption == "") {
             // If an option is expanded and newActiveOption == ""
             // then close active option
-            Animated.timing(colorAnimatedOpacity, {
+            Animated.timing(animatedOpacity, {
                 toValue: 0,
                 duration: duration,
                 useNativeDriver: true,
@@ -89,7 +114,11 @@ export default function DrawingOptions({
     return (
         <>
             <Animated.View
-                style={[styles.options, { opacity: colorAnimatedOpacity }]}
+                style={[
+                    styles.options,
+                    { bottom: mainButtonContainerHeight },
+                    { opacity: animatedOpacity },
+                ]}
             >
                 {activeOption === "color" &&
                     options.color.values.map(c => (
@@ -113,14 +142,13 @@ export default function DrawingOptions({
                                 key: w,
                                 isActive: w === strokeWidth,
                                 onPress: () => setStrokeWidth(w),
-                                style: { backgroundColor: "#999" },
                             }}
                         >
                             <View
                                 style={{
                                     height: "100%",
                                     width: 10 * w,
-                                    backgroundColor: "black",
+                                    backgroundColor: color,
                                 }}
                             />
                         </SelectableButton>
@@ -132,20 +160,49 @@ export default function DrawingOptions({
                                 key: o,
                                 isActive: o === opacity,
                                 onPress: () => setOpacity(o),
-                                style: { backgroundColor: "#999" },
                             }}
                         >
                             <View
                                 style={{
                                     width: "100%",
                                     height: "100%",
-                                    backgroundColor: `rgba(0, 0, 0, ${o})`,
+                                    backgroundColor: `rgba(${colorToRGBArray(
+                                        color
+                                    ).join(", ")}, ${o})`,
                                 }}
                             />
                         </SelectableButton>
                     ))}
+                {activeOption === "effect" &&
+                    options.effect.values.map(e => (
+                        <SelectableButton
+                            {...{
+                                key: e,
+                                isActive: e === effect,
+                                onPress: () => setEffect(e),
+                            }}
+                        >
+                            <Canvas style={styles.canvas}>
+                                <StyledPath
+                                    {...{
+                                        path,
+                                        color,
+                                        strokeWidth: 0.5,
+                                        opacity: 1,
+                                        pathEffect: e,
+                                    }}
+                                />
+                            </Canvas>
+                        </SelectableButton>
+                    ))}
             </Animated.View>
-            <View style={styles.mainButtonContainer}>
+            <View
+                onLayout={event => {
+                    const { height, y } = event.nativeEvent.layout
+                    setOptionsOffset(height + windowHeight - (y + height))
+                }}
+                style={styles.mainButtonContainer}
+            >
                 <SelectableButton
                     {...{
                         isActive: activeOption === "color",
@@ -176,7 +233,7 @@ export default function DrawingOptions({
                         style: {
                             height: 32,
                             width: 32,
-                            backgroundColor: "#999",
+                            backgroundColor: "white",
                         },
                     }}
                 >
@@ -184,7 +241,7 @@ export default function DrawingOptions({
                         style={{
                             height: "100%",
                             width: 10 * strokeWidth,
-                            backgroundColor: "black",
+                            backgroundColor: color,
                         }}
                     />
                 </SelectableButton>
@@ -210,9 +267,43 @@ export default function DrawingOptions({
                             <LinearGradient
                                 start={vec(0, 32)}
                                 end={vec(32, 0)}
-                                colors={["black", "#00000000"]}
+                                colors={[
+                                    colorValueToSkiaColor(color),
+                                    `rgba(${colorToRGBArray(color).join(
+                                        ", "
+                                    )}, 0)`,
+                                ]}
                             />
                         </Rect>
+                    </Canvas>
+                </SelectableButton>
+                <SelectableButton
+                    {...{
+                        isActive: activeOption === "effect",
+                        onPress: () => {
+                            if (activeOption === "effect") {
+                                changeActiveOption("")
+                            } else {
+                                changeActiveOption("effect")
+                            }
+                        },
+                        style: {
+                            height: 32,
+                            width: 32,
+                            backgroundColor: "white",
+                        },
+                    }}
+                >
+                    <Canvas style={styles.canvas}>
+                        <StyledPath
+                            {...{
+                                path,
+                                color,
+                                strokeWidth: 0.5,
+                                opacity: 1,
+                                pathEffect: effect,
+                            }}
+                        />
                     </Canvas>
                 </SelectableButton>
             </View>
@@ -222,15 +313,14 @@ export default function DrawingOptions({
 
 const styles = StyleSheet.create({
     mainButtonContainer: {
-        position: "relative",
         padding: 8,
+        width: "100%",
         flexDirection: "row",
         justifyContent: "space-around",
         alignItems: "center",
     },
     options: {
         position: "absolute",
-        bottom: 48,
         width: "100%",
         padding: 8,
         flexDirection: "row",
@@ -238,6 +328,7 @@ const styles = StyleSheet.create({
     },
     option: {},
     canvas: {
+        backgroundColor: "white",
         position: "absolute",
         width: "100%",
         height: "100%",
